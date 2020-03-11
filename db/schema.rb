@@ -18,7 +18,7 @@ ActiveRecord::Schema.define(version: 2020_03_10_185802) do
   create_table "holidays", force: :cascade do |t|
     t.integer "year_id"
     t.string "name"
-    t.integer "year"
+    t.integer "yr"
     t.integer "day"
     t.integer "month"
     t.datetime "created_at", null: false
