@@ -107,12 +107,12 @@ class YearsController < ApplicationController
         end
 
         #checks for months with 30 days
-        if [4,6,9,11].include(i)
+        if [4,6,9,11].include?(i)
           days += 30
         end
 
         # checks for months with 31 days
-        if [1,3,5,7,8,10,12].include(i)
+        if [1,3,5,7,8,10,12].include?(i)
           days += 31
         end
       end
@@ -123,8 +123,10 @@ class YearsController < ApplicationController
   #finds the total number of holidays that overlap with the vacation duration
   def find_overlap(start_date, end_date, object)
     #finds the holidays of that year
-    holidays = Year.find_by(year: start_date['yr'])
+
+    holidays = Year.find_by(year: start_date['yr']).holidays
     #removes the holidays that occur before the start date
+    index = holidays.index(start_date)
     length = holidays.length
     filtered_holidays = holidays.slice(index, length)
 
@@ -142,7 +144,7 @@ class YearsController < ApplicationController
     end
 
     #add all the holidays for that year if the start year and end year are not the same
-    if start_date['yr'] != end_date ['yr']
+    if start_date['yr'] != end_date['yr']
       object['count'] += weekday_holidays.length
       new_year = start_date['yr'] + 1
       new_start_date = Year.find_by(year: new_year).holidays[0]
@@ -158,17 +160,23 @@ class YearsController < ApplicationController
           count += 1
           object['names'].push(holiday['name'])
         #adds holiday that occur during the months before the end date
-        elsif  end_date['month'] > holiday ['month'] && !object['names'].include?(holiday['name'])
+        elsif  end_date['month'] > holiday['month'] && !object['names'].include?(holiday['name'])
           count += 1
           object['names'].push(holiday['name'])
         end
       end
 
       #recalculate if there are more overlap holidays after adding overlap holidays
+      # binding.pry
+      count = object['count']
       if count > object['count']
         pto = days_until_last(count - 1, start_date, end_date)
         new_end_date = find_end_date(start_date['month'], pto, end_date['yr'], true)
-        return find_overlap(start_date, new_end_date, {"count" => count -1, "names"=> object['names']})
+        # if count == 1
+        #   return find_overlap(start_date, new_end_date, {"count" => count - 1, "names" => object['names']})
+        # else
+          return find_overlap(start_date, new_end_date, {"count" => count - 1, "names" => object['names']})
+        # end
       end
 
       #if none of the conditions above are true, it'll return the count because it's calculated all overlapping holidays
@@ -198,11 +206,12 @@ class YearsController < ApplicationController
     weekends = (pto/5).floor
     #adds the total # of days based on # of pto starting from the first day of the month
     # Ex: 2/16/2020 start date with 10 pto would give us 26
-    total_days = holiday['day'] + pto (weekends * 2)
+    total_days = holiday['day'] + pto + (weekends * 2)
     # calculates the last day of the vacation
     end_date = find_end_date(holiday['month'], total_days, holiday['yr'], true)
     # finds overlapping holidays
-    overlap = find_overlap(holiday, end_date, object)
+    count_object = {"count" => 0, "names" => []}
+    overlap = find_overlap(holiday, end_date, count_object)
     # recalculates the last day of the vacation by adding the # of overlapping holidays to pto
     new_end_date = find_end_date(holiday['month'], total_days + overlap, holiday['yr'], true)
 
@@ -217,6 +226,7 @@ class YearsController < ApplicationController
     end
 
     # returns a string of the duration Ex: 1/1/2020 - 2/5/2020
+    # binding.pry
     return "#{holiday['month']}/#{start_day}/#{holiday['yr']} - #{new_end_date['month']}/#{new_end_date['day']}/#{new_end_date['yr']}"
   end
 
@@ -225,9 +235,41 @@ class YearsController < ApplicationController
     array = []
     holidays = Year.find_by(year: year).holidays
 
-    holdiays.each do |holiday|
+    weekday_holidays = []
+
+    # filters holidays that land on a weekday
+    holidays.each do |holiday|
+      if ![0,6].include?(find_day_of_week(holiday)) && holiday['name'] != "New Year's Day observed"
+        weekday_holidays.push(holiday)
+      end
+    end
+
+    # calculate each weekday holiday vacation duration
+    weekday_holidays.each do |holiday|
       array.push(calculate(holiday, pto))
     end
+
+    return array
   end
+
+  def show
+    year = Year.find_by(year: params[:year])
+    @results = Result.where(year_id: year, pto: params[:pto])
+
+    if @results.length == 0
+      array = calculate_vacation(params[:year], params[:pto])
+      array.each do |vacation|
+        Result.create(
+          year_id: year.id,
+          pto: params[:pto],
+          result: vacation
+        )
+      end
+      @results = Result.where(year_id: year, pto: params[:pto])
+    end
+
+    render json: @results
+  end
+
 
 end
