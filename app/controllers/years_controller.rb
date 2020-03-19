@@ -252,12 +252,12 @@ class YearsController < ApplicationController
     return array
   end
 
-  def show
-    year = Year.find_by(year: params[:year])
+  def create
+    year = Year.find_by(year: year_params[:year])
     @results = Result.where(year_id: year, pto: params[:pto])
 
     if @results.length == 0
-      array = calculate_vacation(params[:year], params[:pto])
+      array = calculate_vacation(year_params[:year], year_params[:pto])
       array.each do |vacation|
         Result.create(
           year_id: year.id,
@@ -265,10 +265,17 @@ class YearsController < ApplicationController
           result: vacation
         )
       end
-      @results = Result.where(year_id: year, pto: params[:pto])
+      @results = Result.where(year_id: year, pto: year_params[:pto])
     end
 
-    render json: @results
+    render json: {result: @results}
+  end
+
+
+  private
+
+  def year_params
+    params.require(:year).permit(:year, :pto)
   end
 
 
