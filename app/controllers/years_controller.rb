@@ -254,14 +254,14 @@ class YearsController < ApplicationController
 
   def create
     year = Year.find_by(year: year_params[:year])
-    @results = Result.where(year_id: year, pto: params[:pto])
+    @results = Result.where(year_id: year, pto: year_params[:pto])
 
     if @results.length == 0
       array = calculate_vacation(year_params[:year], year_params[:pto])
       array.each do |vacation|
         Result.create(
           year_id: year.id,
-          pto: params[:pto],
+          pto: year_params[:pto],
           result: vacation
         )
       end
